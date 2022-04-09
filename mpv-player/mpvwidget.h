@@ -15,10 +15,10 @@ public:
     void command(const QVariant& params);
     void setProperty(const QString& name, const QVariant& value);
     QVariant getProperty(const QString& name) const;
-    QSize sizeHint() const { return QSize(480, 270);}
+    QSize sizeHint() const override { return QSize(480, 270);}
 Q_SIGNALS:
-    void durationChanged(int value);
-    void positionChanged(int value);
+    void durationChanged(double value);
+    void positionChanged(double value);
 protected:
     void initializeGL() Q_DECL_OVERRIDE;
     void paintGL() Q_DECL_OVERRIDE;

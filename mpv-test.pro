@@ -11,12 +11,14 @@ CONFIG += c++11
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
-    mpvwidget.cpp
+    mpv-player/MpvPlayer.cpp \
+    mpv-player/mpvwidget.cpp
 
 HEADERS += \
     mainwindow.h \
-    mpvwidget.h \
-    qthelper.hpp
+    mpv-player/MpvPlayer.h \
+    mpv-player/mpvwidget.h \
+    mpv-player/qthelper.hpp
 
 INCLUDEPATH += $$PWD/mpv-dev-x86_64/include
 LIBS += -L$$PWD/mpv-dev-x86_64/ -llibmpv
