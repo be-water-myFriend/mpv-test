@@ -19,44 +19,68 @@ static void *get_proc_address(void *ctx, const char *name) {
 MpvWidget::MpvWidget(QWidget *parent, Qt::WindowFlags f)
     : QOpenGLWidget(parent, f)
 {
-    mpv = mpv_create();
-    if (!mpv)
+    m_mpvCtl.mpv = mpv_create();
+    if (!m_mpvCtl.mpv) {
         throw std::runtime_error("could not create mpv context");
+    }
+    m_mpvCtl.moveToThread(&workerThread);
+    connect(this, &MpvWidget::signalAsyncSetCommand, &m_mpvCtl, &MpvController::setCommand);
+    connect(this, &MpvWidget::signalAsyncSetProperty, &m_mpvCtl, &MpvController::setProperty);
+    workerThread.start();
 
-    mpv_set_option_string(mpv, "terminal", "yes");
-    mpv_set_option_string(mpv, "msg-level", "all=v");
-    if (mpv_initialize(mpv) < 0)
+    mpv_set_option_string(m_mpvCtl.mpv, "terminal", "yes");
+    mpv_set_option_string(m_mpvCtl.mpv, "keep-open", "yes");
+    mpv_set_option_string(m_mpvCtl.mpv, "msg-level", "all=error");
+    if (mpv_initialize(m_mpvCtl.mpv) < 0) {
         throw std::runtime_error("could not initialize mpv context");
+    }
 
     // Request hw decoding, just for testing.
-    mpv::qt::set_option_variant(mpv, "hwdec", "auto");
+    mpv::qt::set_option_variant(m_mpvCtl.mpv, "hwdec", "auto");
 
-    mpv_observe_property(mpv, 0, "duration", MPV_FORMAT_DOUBLE);
-    mpv_observe_property(mpv, 0, "time-pos", MPV_FORMAT_DOUBLE);
-    mpv_set_wakeup_callback(mpv, wakeup, this);
+    mpv_observe_property(m_mpvCtl.mpv, 0, "duration", MPV_FORMAT_DOUBLE);
+    mpv_observe_property(m_mpvCtl.mpv, 0, "time-pos", MPV_FORMAT_DOUBLE);
+    mpv_observe_property(m_mpvCtl.mpv, 0, "pause", MPV_FORMAT_FLAG);
+    mpv_observe_property(m_mpvCtl.mpv, 0, "eof-reached", MPV_FORMAT_FLAG);
+    mpv_set_wakeup_callback(m_mpvCtl.mpv, wakeup, this);
 }
 
 MpvWidget::~MpvWidget()
 {
+    workerThread.quit();
+    workerThread.wait();
+
     makeCurrent();
-    if (mpv_gl)
+    if (mpv_gl) {
         mpv_render_context_free(mpv_gl);
-    mpv_terminate_destroy(mpv);
+    }
+
+    mpv_terminate_destroy(m_mpvCtl.mpv);
 }
 
-void MpvWidget::command(const QVariant& params)
+int MpvWidget::setCommand(const QVariant& params)
 {
-    mpv::qt::command_variant(mpv, params);
+    return m_mpvCtl.setCommand(params);
 }
 
 void MpvWidget::setProperty(const QString& name, const QVariant& value)
 {
-    mpv::qt::set_property_variant(mpv, name, value);
+    m_mpvCtl.setProperty(name, value);
 }
 
 QVariant MpvWidget::getProperty(const QString &name) const
 {
-    return mpv::qt::get_property_variant(mpv, name);
+    return m_mpvCtl.getProperty(name);
+}
+
+void MpvWidget::asyncSetCommand(const QVariant &params)
+{
+    emit signalAsyncSetCommand(params);
+}
+
+void MpvWidget::asyncSetProperty(const QString &name, const QVariant &value)
+{
+    emit signalAsyncSetProperty(name, value);
 }
 
 void MpvWidget::initializeGL()
@@ -68,7 +92,7 @@ void MpvWidget::initializeGL()
         {MPV_RENDER_PARAM_INVALID, nullptr}
     };
 
-    if (mpv_render_context_create(&mpv_gl, mpv, params) < 0)
+    if (mpv_render_context_create(&mpv_gl, m_mpvCtl.mpv, params) < 0)
         throw std::runtime_error("failed to initialize mpv GL context");
     mpv_render_context_set_update_callback(mpv_gl, MpvWidget::on_update, reinterpret_cast<void *>(this));
 }
@@ -91,8 +115,8 @@ void MpvWidget::paintGL()
 void MpvWidget::on_mpv_events()
 {
     // Process all events, until the event queue is empty.
-    while (mpv) {
-        mpv_event *event = mpv_wait_event(mpv, 0);
+    while (m_mpvCtl.mpv) {
+        mpv_event *event = mpv_wait_event(m_mpvCtl.mpv, 0);
         if (event->event_id == MPV_EVENT_NONE) {
             break;
         }
@@ -114,6 +138,17 @@ void MpvWidget::handle_mpv_event(mpv_event *event)
             if (prop->format == MPV_FORMAT_DOUBLE) {
                 double time = *(double *)prop->data;
                 Q_EMIT durationChanged(time);
+            }
+        } else if (strcmp(prop->name, "pause") == 0) {
+            if (prop->format == MPV_FORMAT_FLAG) {
+                int flag = *(int *)prop->data;
+                Q_EMIT pauseChanged(flag);
+            }
+        } else if (strcmp(prop->name, "eof-reached") == 0) {
+            if (prop->format == MPV_FORMAT_FLAG)
+            {
+                int flag = *(int *)prop->data;
+                Q_EMIT eofReachedChanged(flag);
             }
         }
         break;

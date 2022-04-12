@@ -10,18 +10,12 @@ CONFIG += c++11
 
 SOURCES += \
     main.cpp \
-    mainwindow.cpp \
-    mpv-player/MpvPlayer.cpp \
-    mpv-player/mpvwidget.cpp
+    mainwindow.cpp
 
 HEADERS += \
-    mainwindow.h \
-    mpv-player/MpvPlayer.h \
-    mpv-player/mpvwidget.h \
-    mpv-player/qthelper.hpp
+    mainwindow.h
 
-INCLUDEPATH += $$PWD/mpv-dev-x86_64/include
-LIBS += -L$$PWD/mpv-dev-x86_64/ -llibmpv
+include(mpv-player/mpvQtLib.pri)
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
