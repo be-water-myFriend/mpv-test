@@ -17,6 +17,11 @@ MpvPlayer::MpvPlayer(QWidget *parent) : QWidget(parent)
     setLayout(vl);
     vl->addWidget(m_mpv);
 
+    initSignalConnect();
+}
+
+void MpvPlayer::initSignalConnect()
+{
     // 播放位置改变
     connect(m_mpv, &MpvWidget::positionChanged, this, [=](double pos) {
         emit signalPositionChanged(pos * 1000);
@@ -35,31 +40,58 @@ MpvPlayer::MpvPlayer(QWidget *parent) : QWidget(parent)
         }
     });
 
-    connect(m_mpv, &MpvWidget::eofReachedChanged, this, [=](int value){
-        if(value) {
+    connect(m_mpv, &MpvWidget::signalMpvEventStartFile, this, [=](){
+
+    });
+    connect(m_mpv, &MpvWidget::signalMpvEventFileLoaded, this, [=](){
+        if (!m_mpv->getProperty("pause").toBool()) {
+            setState(PlayState::Play);
+        }
+    });
+    connect(m_mpv, &MpvWidget::signalMpvEventEndFile, this, [=](int reason){
+        switch (reason) {
+        case MPV_END_FILE_REASON_EOF:
             setState(PlayState::EndReached);
 
             // 循环播放
             mediaListNext();
+            break;
+        case MPV_END_FILE_REASON_ERROR:
+
+            // 循环播放
+            mediaListNext();
+            break;
+        case MPV_END_FILE_REASON_STOP:
+            setState(PlayState::Stop);
+            break;
+
+        case MPV_END_FILE_REASON_QUIT:
+            setState(PlayState::Stop);
+            break;
+
+        case MPV_END_FILE_REASON_REDIRECT:
+            setState(PlayState::Stop);
+            break;
+        default:
+            break;
         }
+    });
+
+    connect(m_mpv, &MpvWidget::signalMpvEventIdling, this, [=](){
+        setState(PlayState::Idle);
     });
 }
 
 bool MpvPlayer::openMedia(QString filepath)
 {
-    setState(PlayState::Opening);
-//    if(!m_mpv->setCommand(QStringList() << "loadfile" << filepath))
-//    {
-//        m_mpv->setProperty("pause", false);
-//        setState(PlayState::Play);
-//        return true;
-//    }
-//    return false;
+    //    if(!m_mpv->setCommand(QStringList() << "loadfile" << filepath))
+    //    {
+    //        return true;
+    //    }
+    //    return false;
 
     m_mpv->asyncSetCommand(QStringList() << "loadfile" << filepath);
-        m_mpv->setProperty("pause", false);
-        setState(PlayState::Play);
-        return true;
+    return true;
 }
 
 void MpvPlayer::seek(int msPos)

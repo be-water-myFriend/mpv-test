@@ -21,6 +21,7 @@ class MpvPlayer : public QWidget
 public:
     explicit MpvPlayer(QWidget *parent = nullptr);
 
+    void initSignalConnect();
     bool openMedia(QString filepath);
 
     void pauseResume();
@@ -66,7 +67,6 @@ private:
     MpvWidget *m_mpv;
 
     PlayState m_state;
-
     int m_playIndex;
     QList<QString> m_Playlist;
 };

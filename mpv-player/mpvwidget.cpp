@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <QtGui/QOpenGLContext>
 #include <QtCore/QMetaObject>
+#include <QDebug>
 
 static void wakeup(void *ctx)
 {
@@ -19,30 +20,12 @@ static void *get_proc_address(void *ctx, const char *name) {
 MpvWidget::MpvWidget(QWidget *parent, Qt::WindowFlags f)
     : QOpenGLWidget(parent, f)
 {
-    m_mpvCtl.mpv = mpv_create();
-    if (!m_mpvCtl.mpv) {
-        throw std::runtime_error("could not create mpv context");
-    }
     m_mpvCtl.moveToThread(&workerThread);
     connect(this, &MpvWidget::signalAsyncSetCommand, &m_mpvCtl, &MpvController::setCommand);
     connect(this, &MpvWidget::signalAsyncSetProperty, &m_mpvCtl, &MpvController::setProperty);
     workerThread.start();
 
-    mpv_set_option_string(m_mpvCtl.mpv, "terminal", "yes");
-    mpv_set_option_string(m_mpvCtl.mpv, "keep-open", "yes");
-    mpv_set_option_string(m_mpvCtl.mpv, "msg-level", "all=error");
-    if (mpv_initialize(m_mpvCtl.mpv) < 0) {
-        throw std::runtime_error("could not initialize mpv context");
-    }
-
-    // Request hw decoding, just for testing.
-    mpv::qt::set_option_variant(m_mpvCtl.mpv, "hwdec", "auto");
-
-    mpv_observe_property(m_mpvCtl.mpv, 0, "duration", MPV_FORMAT_DOUBLE);
-    mpv_observe_property(m_mpvCtl.mpv, 0, "time-pos", MPV_FORMAT_DOUBLE);
-    mpv_observe_property(m_mpvCtl.mpv, 0, "pause", MPV_FORMAT_FLAG);
-    mpv_observe_property(m_mpvCtl.mpv, 0, "eof-reached", MPV_FORMAT_FLAG);
-    mpv_set_wakeup_callback(m_mpvCtl.mpv, wakeup, this);
+    m_mpvCtl.setEventCallback(wakeup, this);
 }
 
 MpvWidget::~MpvWidget()
@@ -141,20 +124,48 @@ void MpvWidget::handle_mpv_event(mpv_event *event)
             }
         } else if (strcmp(prop->name, "pause") == 0) {
             if (prop->format == MPV_FORMAT_FLAG) {
-                int flag = *(int *)prop->data;
-                Q_EMIT pauseChanged(flag);
-            }
-        } else if (strcmp(prop->name, "eof-reached") == 0) {
-            if (prop->format == MPV_FORMAT_FLAG)
-            {
-                int flag = *(int *)prop->data;
-                Q_EMIT eofReachedChanged(flag);
+                int flag = *(static_cast<int*>(prop->data));
+                if(flag && (m_mpvCtl.getProperty("idle-active").toBool() == false))
+                {
+                    Q_EMIT pauseChanged(flag);
+                }
+
+                qDebug()<<"handle_mpv_event:"<<"MPV_EVENT_PROPERTY_CHANGE pause="
+                        <<flag
+                        <<" idle-active="
+                        <<m_mpvCtl.getProperty("idle-active").toBool();
             }
         }
         break;
     }
+
+    case MPV_EVENT_START_FILE: {
+        qDebug()<<"handle_mpv_event:"<<"start file";
+        emit signalMpvEventStartFile();
+        break;
+    }
+    case MPV_EVENT_FILE_LOADED: {
+        qDebug()<<"handle_mpv_event:"<<"file loaded";
+        emit signalMpvEventFileLoaded();
+        break;
+    }
+    case MPV_EVENT_END_FILE: {
+        const mpv_event_end_file* end_file_data = (mpv_event_end_file*)event->data;
+        emit signalMpvEventEndFile(end_file_data->reason);
+
+        qDebug()<<"handle_mpv_event:"<<"end file reason="<<end_file_data->reason;
+        break;
+    }
+    case MPV_EVENT_IDLE: {
+        qDebug()<<"handle_mpv_event:"<<"idling";
+        emit signalMpvEventIdling();
+        break;
+    }
+
     default: ;
         // Ignore uninteresting or unknown events.
+        //        qDebug()<<"handle_mpv_event:"<<"unknown event id="<<event->event_id;
+        break;
     }
 }
 
