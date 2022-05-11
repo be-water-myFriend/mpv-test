@@ -12,6 +12,9 @@ class MainWindow : public QWidget
 public:
     explicit MainWindow(QWidget *parent = 0);
 
+protected:
+  virtual bool eventFilter(QObject *, QEvent *);
+
 private Q_SLOTS:
     void setSliderRange(int duration);
 private:

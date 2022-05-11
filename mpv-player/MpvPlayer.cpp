@@ -2,6 +2,7 @@
 #include "mpvwidget.h"
 #include <QVBoxLayout>
 #include <QDebug>
+#include <QDateTime>
 
 MpvPlayer::MpvPlayer(QWidget *parent) : QWidget(parent)
 {
@@ -32,7 +33,8 @@ void MpvPlayer::initSignalConnect()
 {
     // 播放位置改变
     connect(m_mpv, &MpvWidget::positionChanged, this, [=](double pos) {
-        emit signalPositionChanged(pos * 1000);
+        m_position = pos * 1000;
+        emit signalPositionChanged(m_position);
     });
 
     // 视频时长改变
@@ -112,6 +114,7 @@ bool MpvPlayer::openMedia(QString filepath)
     //    }
     //    return false;
 
+    m_position = 0;
     m_mpv->asyncMpvSetCommand(QStringList() << "loadfile" << filepath);
     return true;
 }
@@ -173,8 +176,8 @@ bool MpvPlayer::isMute()
 
 int MpvPlayer::position()
 {
-    double time = m_mpv->getMpvProperty("playback-time").toDouble();
-    return time*1000;
+//    double time = m_mpv->getMpvProperty("playback-time").toDouble();
+    return m_position;
 }
 
 int MpvPlayer::duration()

@@ -77,7 +77,8 @@ private:
     MpvWidget *m_mpv;
 
     PlayState m_state;
-    int m_playIndex;
+    int m_position{};
+    int m_playIndex{};
     LoopState m_loopState;
     QList<QString> m_Playlist;
 };
