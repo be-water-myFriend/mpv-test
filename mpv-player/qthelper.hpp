@@ -328,6 +328,15 @@ static inline int set_property(mpv_handle *ctx, const QString &name,
     return mpv_set_property(ctx, name.toUtf8().data(), MPV_FORMAT_NODE, node.node());
 }
 
+static inline void setPropertyAsync(mpv_handle *ctx, const QString &name,
+                                            const QVariant &value)
+{
+    mpv::qt::node_builder node(value);
+    quint64 replyUserdata = 0;
+    mpv_set_property_async(ctx, replyUserdata,
+                           name.toUtf8().data(), MPV_FORMAT_NODE, node.node());
+}
+
 /**
  * mpv_command_node() equivalent.
  *
@@ -343,6 +352,24 @@ static inline QVariant command(mpv_handle *ctx, const QVariant &args)
         return QVariant::fromValue(ErrorReturn(err));
     node_autofree f(&res);
     return node_to_variant(&res);
+}
+
+/**
+ * mpv_command_node_async() equivalent.
+ *
+ * @param args command arguments, with args[0] being the command name as string
+ * @return empty QVariant, or an ErrorReturn with the error code
+ */
+static inline QVariant command_async(mpv_handle *ctx, const QVariant &args)
+{
+    node_builder node(args);
+    quint64 replyUserdata = 0; // TODO: Bomi casted args[0] to int. Bomi's args was a QByteArray however.
+    int err = mpv_command_node_async(ctx, replyUserdata, node.node());
+    if (err < 0)
+        return QVariant::fromValue(ErrorReturn(err));
+    // TODO: Return unique replyUserdata so the app can wait for
+    // the result in an MPV_EVENT_COMMAND_REPLY event.
+    return QVariant();
 }
 
 }

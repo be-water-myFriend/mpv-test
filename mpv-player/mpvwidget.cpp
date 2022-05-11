@@ -20,19 +20,11 @@ static void *get_proc_address(void *ctx, const char *name) {
 MpvWidget::MpvWidget(QWidget *parent, Qt::WindowFlags f)
     : QOpenGLWidget(parent, f)
 {
-    m_mpvCtl.moveToThread(&workerThread);
-    connect(this, &MpvWidget::signalAsyncSetCommand, &m_mpvCtl, &MpvController::setCommand);
-    connect(this, &MpvWidget::signalAsyncSetProperty, &m_mpvCtl, &MpvController::setProperty);
-    workerThread.start();
-
     m_mpvCtl.setEventCallback(wakeup, this);
 }
 
 MpvWidget::~MpvWidget()
 {
-    workerThread.quit();
-    workerThread.wait();
-
     makeCurrent();
     if (mpv_gl) {
         mpv_render_context_free(mpv_gl);
@@ -41,29 +33,29 @@ MpvWidget::~MpvWidget()
     mpv_terminate_destroy(m_mpvCtl.mpv);
 }
 
-int MpvWidget::setCommand(const QVariant& params)
+int MpvWidget::setMpvCommand(const QVariant& params)
 {
-    return m_mpvCtl.setCommand(params);
+    return m_mpvCtl.setMpvCommand(params);
 }
 
-void MpvWidget::setProperty(const QString& name, const QVariant& value)
+void MpvWidget::setMpvProperty(const QString& name, const QVariant& value)
 {
-    m_mpvCtl.setProperty(name, value);
+    m_mpvCtl.setMpvProperty(name, value);
 }
 
-QVariant MpvWidget::getProperty(const QString &name) const
+QVariant MpvWidget::getMpvProperty(const QString &name) const
 {
-    return m_mpvCtl.getProperty(name);
+    return m_mpvCtl.getMpvProperty(name);
 }
 
-void MpvWidget::asyncSetCommand(const QVariant &params)
+void MpvWidget::asyncMpvSetCommand(const QVariant &params)
 {
-    emit signalAsyncSetCommand(params);
+    m_mpvCtl.setMpvCommandAsync(params);
 }
 
-void MpvWidget::asyncSetProperty(const QString &name, const QVariant &value)
+void MpvWidget::asyncMpvSetProperty(const QString &name, const QVariant &value)
 {
-    emit signalAsyncSetProperty(name, value);
+    m_mpvCtl.setMpvPropertyAsync(name, value);
 }
 
 void MpvWidget::initializeGL()
@@ -125,27 +117,27 @@ void MpvWidget::handle_mpv_event(mpv_event *event)
         } else if (strcmp(prop->name, "pause") == 0) {
             if (prop->format == MPV_FORMAT_FLAG) {
                 int flag = *(static_cast<int*>(prop->data));
-                if(flag && (m_mpvCtl.getProperty("idle-active").toBool() == false))
+                if(m_mpvCtl.getMpvProperty("idle-active").toBool() == false)
                 {
                     Q_EMIT pauseChanged(flag);
                 }
 
-                qDebug()<<"handle_mpv_event:"<<"MPV_EVENT_PROPERTY_CHANGE pause="
-                        <<flag
-                        <<" idle-active="
-                        <<m_mpvCtl.getProperty("idle-active").toBool();
+//                qDebug()<<"handle_mpv_event:"<<"MPV_EVENT_PROPERTY_CHANGE pause="
+//                        <<flag
+//                        <<" idle-active="
+//                        <<m_mpvCtl.getProperty("idle-active").toBool();
             }
         }
         break;
     }
 
     case MPV_EVENT_START_FILE: {
-        qDebug()<<"handle_mpv_event:"<<"start file";
+//        qDebug()<<"handle_mpv_event:"<<"start file";
         emit signalMpvEventStartFile();
         break;
     }
     case MPV_EVENT_FILE_LOADED: {
-        qDebug()<<"handle_mpv_event:"<<"file loaded";
+//        qDebug()<<"handle_mpv_event:"<<"file loaded";
         emit signalMpvEventFileLoaded();
         break;
     }
@@ -153,11 +145,11 @@ void MpvWidget::handle_mpv_event(mpv_event *event)
         const mpv_event_end_file* end_file_data = (mpv_event_end_file*)event->data;
         emit signalMpvEventEndFile(end_file_data->reason);
 
-        qDebug()<<"handle_mpv_event:"<<"end file reason="<<end_file_data->reason;
+//        qDebug()<<"handle_mpv_event:"<<"end file reason="<<end_file_data->reason;
         break;
     }
     case MPV_EVENT_IDLE: {
-        qDebug()<<"handle_mpv_event:"<<"idling";
+//        qDebug()<<"handle_mpv_event:"<<"idling";
         emit signalMpvEventIdling();
         break;
     }

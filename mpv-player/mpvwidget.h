@@ -29,7 +29,7 @@ public:
         }
 
         // Request hw decoding, just for testing.
-        mpv::qt::set_option_variant(mpv, "hwdec", "auto");
+        mpv::qt::set_property(mpv, "hwdec", "auto-copy");
 
         mpv_observe_property(mpv, 0, "duration", MPV_FORMAT_DOUBLE);
         mpv_observe_property(mpv, 0, "time-pos", MPV_FORMAT_DOUBLE);
@@ -38,19 +38,29 @@ public:
     }
 
 public slots:
-    int setCommand(const QVariant& params)
+    int setMpvCommand(const QVariant& params)
     {
-        return mpv::qt::get_error(mpv::qt::command_variant(mpv, params));
+        return mpv::qt::get_error(mpv::qt::command(mpv, params));
     }
 
-    void setProperty(const QString& name, const QVariant& value)
+    int setMpvCommandAsync(const QVariant& params)
     {
-        mpv::qt::set_property_variant(mpv, name, value);
+        return mpv::qt::get_error(mpv::qt::command_async(mpv, params));
     }
 
-    QVariant getProperty(const QString &name) const
+    void setMpvProperty(const QString& name, const QVariant& value)
     {
-        return mpv::qt::get_property_variant(mpv, name);
+        mpv::qt::set_property(mpv, name, value);
+    }
+
+    void setMpvPropertyAsync(const QString& name, const QVariant& value)
+    {
+        mpv::qt::setPropertyAsync(mpv, name, value);
+    }
+
+    QVariant getMpvProperty(const QString &name) const
+    {
+        return mpv::qt::get_property(mpv, name);
     }
 
 signals:
@@ -65,12 +75,12 @@ class MpvWidget Q_DECL_FINAL: public QOpenGLWidget
 public:
     MpvWidget(QWidget *parent = 0, Qt::WindowFlags f = 0);
     ~MpvWidget();
-    int setCommand(const QVariant& params);
-    void setProperty(const QString& name, const QVariant& value);
-    QVariant getProperty(const QString& name) const;
+    int setMpvCommand(const QVariant& params);
+    void setMpvProperty(const QString& name, const QVariant& value);
+    QVariant getMpvProperty(const QString& name) const;
 
-    void asyncSetCommand(const QVariant& params);
-    void asyncSetProperty(const QString& name, const QVariant& value);
+    void asyncMpvSetCommand(const QVariant& params);
+    void asyncMpvSetProperty(const QString& name, const QVariant& value);
     QSize sizeHint() const override { return QSize(480, 270);}
 
 Q_SIGNALS:
@@ -83,9 +93,6 @@ Q_SIGNALS:
     void signalMpvEventFileLoaded();
     void signalMpvEventEndFile(int reason);
     void signalMpvEventIdling();
-
-    void signalAsyncSetCommand(const QVariant& params);
-    void signalAsyncSetProperty(const QString& name, const QVariant& value);
 protected:
     void initializeGL() Q_DECL_OVERRIDE;
     void paintGL() Q_DECL_OVERRIDE;

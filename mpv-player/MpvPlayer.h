@@ -15,11 +15,19 @@ enum PlayState
     EndReached
 };
 
+enum LoopState
+{
+    LoopPrevious = -1, // 上一部
+    LoopNormal,
+    LoopNext
+};
+
 class MpvPlayer : public QWidget
 {
     Q_OBJECT
 public:
     explicit MpvPlayer(QWidget *parent = nullptr);
+    ~MpvPlayer();
 
     void initSignalConnect();
     bool openMedia(QString filepath);
@@ -63,11 +71,14 @@ signals:
     void signalPositionChanged(int time);
     void signalStateChanged(int state);
 
+    bool signalPlayError(int index);
+
 private:
     MpvWidget *m_mpv;
 
     PlayState m_state;
     int m_playIndex;
+    LoopState m_loopState;
     QList<QString> m_Playlist;
 };
 
